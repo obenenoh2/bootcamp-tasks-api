@@ -4,8 +4,13 @@ A minimal FastAPI task tracker.
 
 ## Quick Start
 
+**Use Python 3.10–3.12.** The pinned `pydantic==2.7.0` / `pydantic-core==2.18.1` has no
+prebuilt wheel for Python 3.13+, so pip will try to compile it from source and fail. If
+`python3 -V` shows 3.13 or newer, install 3.12 separately (e.g. `brew install python@3.12`)
+and use that to create the venv below.
+
 ```bash
-python3 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn main:app --reload
