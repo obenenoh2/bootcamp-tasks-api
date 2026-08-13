@@ -1,15 +1,20 @@
-"""Generate the synthetic labeled dataset used by train.py.
+"""Seed the app's Postgres `tasks` table with synthetic, labeled data for train.py.
 
-Not part of the training pipeline itself — run once (already committed as
-model/data/tasks_labeled.csv) to regenerate it if you want more/different rows:
+Not part of the training pipeline itself — run once against a running database
+(e.g. `docker compose up -d db`) to seed rows model/train.py can train on:
 
-    python model/generate_data.py
+    DATABASE_URL=postgresql+psycopg2://tasks:tasks@localhost:5432/tasks python model/generate_data.py
 """
-import csv
+import os
 import random
-from pathlib import Path
+
+from sqlalchemy import create_engine, text
 
 random.seed(42)
+
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL", "postgresql+psycopg2://tasks:tasks@localhost:5432/tasks"
+)
 
 SUBJECTS = [
     "login page", "checkout flow", "API rate limiter", "email service", "dashboard chart",
@@ -74,18 +79,31 @@ def rows():
 
 
 def main() -> None:
-    out_path = Path(__file__).parent / "data" / "tasks_labeled.csv"
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
     data = list(rows())
     random.shuffle(data)
 
-    with out_path.open("w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["title", "description", "priority"])
-        writer.writerows(data)
+    engine = create_engine(DATABASE_URL)
+    with engine.begin() as conn:
+        conn.execute(text(
+            """
+            CREATE TABLE IF NOT EXISTS tasks (
+                id SERIAL PRIMARY KEY,
+                title VARCHAR NOT NULL,
+                description VARCHAR,
+                done BOOLEAN NOT NULL DEFAULT false,
+                priority VARCHAR
+            )
+            """
+        ))
+        conn.execute(
+            text(
+                "INSERT INTO tasks (title, description, done, priority) "
+                "VALUES (:title, :description, false, :priority)"
+            ),
+            [{"title": title, "description": description, "priority": priority} for title, description, priority in data],
+        )
 
-    print(f"wrote {len(data)} rows to {out_path}")
+    print(f"inserted {len(data)} rows into tasks ({DATABASE_URL})")
 
 
 if __name__ == "__main__":

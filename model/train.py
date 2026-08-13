@@ -5,11 +5,14 @@ The model itself is intentionally trivial (TF-IDF + logistic regression) —
 the point of this project is the infrastructure around training, tracking,
 versioning, and serving it, not the model quality.
 
+Reads labeled tasks straight from the app's Postgres database (any row with a
+`priority` set). Run model/generate_data.py first if the table doesn't have
+enough labeled rows yet.
+
 Usage:
     MLFLOW_TRACKING_URI=http://localhost:5000 python model/train.py
 """
 import os
-from pathlib import Path
 
 import mlflow
 import mlflow.sklearn
@@ -19,14 +22,27 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
+from sqlalchemy import create_engine
 
-DATA_PATH = Path(__file__).parent / "data" / "tasks_labeled.csv"
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL", "postgresql+psycopg2://tasks:tasks@localhost:5432/tasks"
+)
 EXPERIMENT_NAME = "task-priority-classifier"
 REGISTERED_MODEL_NAME = "task-priority-classifier"
 
 
 def load_dataset() -> pd.DataFrame:
-    df = pd.read_csv(DATA_PATH)
+    engine = create_engine(DATABASE_URL)
+    df = pd.read_sql(
+        "SELECT title, description, priority FROM tasks WHERE priority IS NOT NULL",
+        engine,
+    )
+    if df.empty:
+        raise RuntimeError(
+            "No labeled tasks found in the database. Seed some with "
+            "`python model/generate_data.py`, or create tasks with a `priority` "
+            "set through the API, before training."
+        )
     df["text"] = df["title"].fillna("") + " " + df["description"].fillna("")
     return df
 
