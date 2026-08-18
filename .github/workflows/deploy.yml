@@ -7,7 +7,6 @@ on:
     branches: [ main, develop ]
   workflow_dispatch:
 
-# Add proper permissions for CodeQL
 permissions:
   contents: read
   security-events: write
@@ -15,7 +14,7 @@ permissions:
   checks: write
 
 env:
-  REGISTRY: acrkingslyproduction.azurecr.io
+  REGISTRY: acrkingslystaging.azurecr.io
   IMAGE_NAME: taskly-api
   STAGING_RESOURCE_GROUP: rg-kingsly-staging
   STAGING_CLUSTER_NAME: aks-kingsly-staging
@@ -77,7 +76,6 @@ jobs:
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
 
-      # Updated to CodeQL Action v4
       - name: Upload Trivy results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v4
         with:
@@ -96,20 +94,36 @@ jobs:
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+          enable-AzPSSession: true
 
       - name: Set AKS context for staging
         uses: azure/aks-set-context@v4
         with:
           resource-group: ${{ env.STAGING_RESOURCE_GROUP }}
           cluster-name: ${{ env.STAGING_CLUSTER_NAME }}
+          admin: true
 
-      - name: Update staging deployment image
+      - name: Create namespace if it doesn't exist
+        run: |
+          kubectl create namespace ${{ env.STAGING_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create ACR secret
+        run: |
+          kubectl create secret docker-registry acr-secret \
+            --namespace ${{ env.STAGING_NAMESPACE }} \
+            --docker-server=${{ env.REGISTRY }} \
+            --docker-username=${{ secrets.ACR_USERNAME }} \
+            --docker-password=${{ secrets.ACR_PASSWORD }} \
+            --docker-email=kingsly@example.com \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy to staging
         run: |
           kubectl set image deployment/taskly-api \
             taskly-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            -n ${{ env.STAGING_NAMESPACE }} || echo "Deployment not found, applying manifest"
+            -n ${{ env.STAGING_NAMESPACE }} 2>/dev/null || kubectl apply -f k8s-deployment.yaml -n ${{ env.STAGING_NAMESPACE }}
           
-          kubectl rollout status deployment/taskly-api -n ${{ env.STAGING_NAMESPACE }} --timeout=5m || echo "Rollout status check failed"
+          kubectl rollout status deployment/taskly-api -n ${{ env.STAGING_NAMESPACE }} --timeout=5m
 
       - name: Verify staging deployment
         run: |
@@ -129,18 +143,42 @@ jobs:
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+          enable-AzPSSession: true
 
       - name: Set AKS context for production
         uses: azure/aks-set-context@v4
         with:
           resource-group: ${{ env.PRODUCTION_RESOURCE_GROUP }}
           cluster-name: ${{ env.PRODUCTION_CLUSTER_NAME }}
+          admin: true
 
-      - name: Update production deployment image
+      - name: Create namespace if it doesn't exist
+        run: |
+          kubectl create namespace ${{ env.PRODUCTION_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create ACR secret
+        run: |
+          kubectl create secret docker-registry acr-secret \
+            --namespace ${{ env.PRODUCTION_NAMESPACE }} \
+            --docker-server=${{ env.REGISTRY }} \
+            --docker-username=${{ secrets.ACR_USERNAME }} \
+            --docker-password=${{ secrets.ACR_PASSWORD }} \
+            --docker-email=kingsly@example.com \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create taskly secrets
+        run: |
+          kubectl create secret generic taskly-secrets \
+            --namespace ${{ env.PRODUCTION_NAMESPACE }} \
+            --from-literal=DATABASE_URL='postgresql://kingslyadmin:KingslySecurePass123!@postgres-kingsly-production.postgres.database.azure.com:5432/taskly' \
+            --from-literal=REDIS_URL='redis://redis-kingsly-production.centralus.redis.azure.net:6379' \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy to production
         run: |
           kubectl set image deployment/taskly-api \
             taskly-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            -n ${{ env.PRODUCTION_NAMESPACE }}
+            -n ${{ env.PRODUCTION_NAMESPACE }} 2>/dev/null || kubectl apply -f k8s-deployment.yaml -n ${{ env.PRODUCTION_NAMESPACE }}
           
           kubectl rollout status deployment/taskly-api -n ${{ env.PRODUCTION_NAMESPACE }} --timeout=5m
 
@@ -164,12 +202,14 @@ jobs:
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+          enable-AzPSSession: true
 
       - name: Set AKS context
         uses: azure/aks-set-context@v4
         with:
           resource-group: ${{ env.PRODUCTION_RESOURCE_GROUP }}
           cluster-name: ${{ env.PRODUCTION_CLUSTER_NAME }}
+          admin: true
 
       - name: Rollback production deployment
         run: |
