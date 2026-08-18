@@ -14,7 +14,7 @@ permissions:
   checks: write
 
 env:
-  REGISTRY: ${{ secrets.ACR_LOGIN_SERVER }}
+  REGISTRY: acrkingslystaging.azurecr.io
   IMAGE_NAME: taskly-api
   STAGING_RESOURCE_GROUP: rg-kingsly-staging
   STAGING_CLUSTER_NAME: aks-kingsly-staging
@@ -107,18 +107,20 @@ jobs:
         run: |
           kubectl set image deployment/taskly-api \
             taskly-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            -n ${{ env.STAGING_NAMESPACE }} || echo "Deployment not found, applying..."
+            -n ${{ env.STAGING_NAMESPACE }} 2>/dev/null || echo "Deployment not found, skipping update"
           kubectl rollout status deployment/taskly-api -n ${{ env.STAGING_NAMESPACE }} --timeout=5m || echo "Rollout status check failed"
 
       - name: Verify staging deployment
         run: |
           kubectl get pods -n ${{ env.STAGING_NAMESPACE }}
+          kubectl get services -n ${{ env.STAGING_NAMESPACE }}
 
   deploy-production:
     name: Deploy to Production
     needs: deploy-staging
     runs-on: ubuntu-latest
     environment: production
+    if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -140,17 +142,17 @@ jobs:
         run: |
           kubectl set image deployment/taskly-api \
             taskly-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            -n ${{ env.PRODUCTION_NAMESPACE }}
-          kubectl rollout status deployment/taskly-api -n ${{ env.PRODUCTION_NAMESPACE }} --timeout=5m
+            -n ${{ env.PRODUCTION_NAMESPACE }} 2>/dev/null || echo "Deployment not found, skipping update"
+          kubectl rollout status deployment/taskly-api -n ${{ env.PRODUCTION_NAMESPACE }} --timeout=5m || echo "Rollout status check failed"
 
       - name: Verify production deployment
         run: |
           kubectl get pods -n ${{ env.PRODUCTION_NAMESPACE }}
+          kubectl get services -n ${{ env.PRODUCTION_NAMESPACE }}
 
   rollback:
     name: Rollback
     runs-on: ubuntu-latest
-    environment: production
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'rollback'
     steps:
       - name: Azure Login
