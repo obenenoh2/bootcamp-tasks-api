@@ -14,11 +14,8 @@ permissions:
   checks: write
 
 env:
-  REGISTRY: acrkingslystaging.azurecr.io
+  REGISTRY: acrkingslyproduction.azurecr.io
   IMAGE_NAME: taskly-api
-  STAGING_RESOURCE_GROUP: rg-kingsly-staging
-  STAGING_CLUSTER_NAME: aks-kingsly-staging
-  STAGING_NAMESPACE: taskly
   PRODUCTION_RESOURCE_GROUP: rg-kingsly-production
   PRODUCTION_CLUSTER_NAME: aks-kingsly-production
   PRODUCTION_NAMESPACE: production
@@ -81,46 +78,11 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
 
-  deploy-staging:
-    name: Deploy to Staging
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    environment: staging
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-          enable-AzPSSession: true
-
-      - name: Set AKS context for staging
-        uses: azure/aks-set-context@v4
-        with:
-          resource-group: ${{ env.STAGING_RESOURCE_GROUP }}
-          cluster-name: ${{ env.STAGING_CLUSTER_NAME }}
-          admin: true
-
-      - name: Deploy to staging
-        run: |
-          kubectl set image deployment/taskly-api \
-            taskly-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            -n ${{ env.STAGING_NAMESPACE }} 2>/dev/null || echo "Deployment not found, skipping update"
-          kubectl rollout status deployment/taskly-api -n ${{ env.STAGING_NAMESPACE }} --timeout=5m || echo "Rollout status check failed"
-
-      - name: Verify staging deployment
-        run: |
-          kubectl get pods -n ${{ env.STAGING_NAMESPACE }}
-          kubectl get services -n ${{ env.STAGING_NAMESPACE }}
-
   deploy-production:
     name: Deploy to Production
-    needs: deploy-staging
+    needs: build-and-test
     runs-on: ubuntu-latest
     environment: production
-    if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -140,10 +102,11 @@ jobs:
 
       - name: Deploy to production
         run: |
+          kubectl apply -f k8s-deployment-prod.yaml -n ${{ env.PRODUCTION_NAMESPACE }} 2>/dev/null || echo "Deployment already exists"
           kubectl set image deployment/taskly-api \
             taskly-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            -n ${{ env.PRODUCTION_NAMESPACE }} 2>/dev/null || echo "Deployment not found, skipping update"
-          kubectl rollout status deployment/taskly-api -n ${{ env.PRODUCTION_NAMESPACE }} --timeout=5m || echo "Rollout status check failed"
+            -n ${{ env.PRODUCTION_NAMESPACE }}
+          kubectl rollout status deployment/taskly-api -n ${{ env.PRODUCTION_NAMESPACE }} --timeout=5m
 
       - name: Verify production deployment
         run: |
