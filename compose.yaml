@@ -1,4 +1,5 @@
 services:
+<<<<<<< HEAD
   db:
     image: postgres:16-alpine
     environment:
@@ -25,10 +26,13 @@ services:
       timeout: 5s
       retries: 5
 
+=======
+>>>>>>> 983f97f (Initial tasks-api — FastAPI bootcamp demo app)
   api:
     build: .
     ports:
       - "8000:8000"
+<<<<<<< HEAD
     environment:
       DATABASE_URL: postgresql+psycopg2://tasks:tasks@db:5432/tasks
       REDIS_URL: redis://redis:6379/0
@@ -45,3 +49,10 @@ services:
 
 volumes:
   db-data:
+=======
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+>>>>>>> 983f97f (Initial tasks-api — FastAPI bootcamp demo app)

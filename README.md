@@ -1,5 +1,6 @@
 # Tasks API
 
+<<<<<<< HEAD
 A minimal FastAPI task tracker backed by Postgres, with a Redis read-through cache.
 
 ## Quick Start (Docker)
@@ -39,10 +40,18 @@ Then run the API itself on your host:
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
+=======
+A minimal FastAPI task tracker used in the DevOps Bootcamp (Weeks 1, 2, and 8).
+
+## Quick Start
+
+```bash
+>>>>>>> 983f97f (Initial tasks-api — FastAPI bootcamp demo app)
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
+<<<<<<< HEAD
 By default the app connects to `postgresql+psycopg2://tasks:tasks@localhost:5432/tasks` and
 `redis://localhost:6379/0` — override with the `DATABASE_URL` / `REDIS_URL` env vars if your
 setup differs.
@@ -188,3 +197,12 @@ dataset file to keep in sync with the app.
 If you run `train.py` before any labeled tasks exist, it fails fast with a clear error telling
 you to run `generate_data.py` or create tasks with a `priority` first, rather than crashing
 deep inside pandas/scikit-learn.
+=======
+Open http://localhost:8000/docs for the interactive API docs.
+
+## With Docker
+
+```bash
+docker compose up
+```
+>>>>>>> 983f97f (Initial tasks-api — FastAPI bootcamp demo app)
