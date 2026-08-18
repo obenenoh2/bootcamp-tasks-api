@@ -2,9 +2,9 @@ name: Taskly CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, feature/* ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
 
 env:
   REGISTRY: acrkingslyproduction.azurecr.io
