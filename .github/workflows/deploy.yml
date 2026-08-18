@@ -14,7 +14,7 @@ permissions:
   checks: write
 
 env:
-  ACR_URL: acrkingslystaging.azurecr.io
+  REGISTRY: acrkingslystaging.azurecr.io
   IMAGE_NAME: taskly-api
   STAGING_RESOURCE_GROUP: rg-kingsly-staging
   STAGING_CLUSTER_NAME: aks-kingsly-staging
@@ -54,24 +54,24 @@ jobs:
       - name: Log in to Azure Container Registry
         uses: azure/docker-login@v2
         with:
-          login-server: acrkingslystaging.azurecr.io
+          login-server: ${{ env.REGISTRY }}
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
       - name: Build and tag Docker image
         run: |
-          docker build -t acrkingslystaging.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }} .
-          docker tag acrkingslystaging.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }} acrkingslystaging.azurecr.io/${{ env.IMAGE_NAME }}:latest
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
       - name: Push Docker image to ACR
         run: |
-          docker push acrkingslystaging.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          docker push acrkingslystaging.azurecr.io/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: acrkingslystaging.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
@@ -106,7 +106,7 @@ jobs:
       - name: Deploy to staging
         run: |
           kubectl set image deployment/taskly-api \
-            taskly-api=acrkingslystaging.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            taskly-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
             -n ${{ env.STAGING_NAMESPACE }} 2>/dev/null || echo "Deployment not found, skipping update"
           kubectl rollout status deployment/taskly-api -n ${{ env.STAGING_NAMESPACE }} --timeout=5m || echo "Rollout status check failed"
 
@@ -141,7 +141,7 @@ jobs:
       - name: Deploy to production
         run: |
           kubectl set image deployment/taskly-api \
-            taskly-api=acrkingslystaging.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            taskly-api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
             -n ${{ env.PRODUCTION_NAMESPACE }} 2>/dev/null || echo "Deployment not found, skipping update"
           kubectl rollout status deployment/taskly-api -n ${{ env.PRODUCTION_NAMESPACE }} --timeout=5m || echo "Rollout status check failed"
 
