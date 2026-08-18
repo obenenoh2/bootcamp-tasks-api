@@ -1,0 +1,6 @@
+subscription_id = "your-subscription-id"
+db_password = "your-secure-password"
+environment = "staging"
+location = "centralus"
+project_name = "kingsly"
+db_username = "kingslyadmin"
