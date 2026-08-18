@@ -1,5 +1,15 @@
 services:
-<<<<<<< HEAD
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: "postgresql://tasks:tasks@db:5432/tasks"
+      REDIS_URL: "redis://redis:6379/0"
+    depends_on:
+      - db
+      - redis
+
   db:
     image: postgres:16-alpine
     environment:
@@ -9,50 +19,15 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tasks"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - postgres_data:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-=======
->>>>>>> 983f97f (Initial tasks-api — FastAPI bootcamp demo app)
-  api:
-    build: .
-    ports:
-      - "8000:8000"
-<<<<<<< HEAD
-    environment:
-      DATABASE_URL: postgresql+psycopg2://tasks:tasks@db:5432/tasks
-      REDIS_URL: redis://redis:6379/0
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+    volumes:
+      - redis_data:/data
 
 volumes:
-  db-data:
-=======
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
->>>>>>> 983f97f (Initial tasks-api — FastAPI bootcamp demo app)
+  postgres_data:
+  redis_data:

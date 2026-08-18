@@ -2,26 +2,23 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Copy requirements first (for better caching)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-<<<<<<< HEAD
-COPY main.py database.py models.py cache.py .
+# Copy all Python files
+COPY *.py .
 
-# Run as non-root — pairs with the Kubernetes PodSecurityContext
-# (runAsNonRoot, readOnlyRootFilesystem) production deployments are
-# expected to enforce at the cluster level.
+# Run as non-root user
 RUN useradd --system --no-create-home --uid 10001 taskly
 USER taskly
 
+# Expose port
 EXPOSE 8000
 
+# Health check
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" || exit 1
 
-=======
-COPY main.py .
-
-EXPOSE 8000
->>>>>>> 983f97f (Initial tasks-api — FastAPI bootcamp demo app)
+# Run the application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
