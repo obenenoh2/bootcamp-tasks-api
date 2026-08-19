@@ -1,7 +1,6 @@
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from models import TaskModel, TaskCreate, TaskUpdate
+from models import Base, TaskModel, TaskCreate, TaskUpdate
 from typing import List, Optional
 import os
 
@@ -9,8 +8,6 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://tasks:tasks@db:5432/tasks
 
 engine = create_engine(DATABASE_URL, echo=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
 
 def init_db():
     """Initialize database - create tables"""
