@@ -1,34 +1,56 @@
+import redis.asyncio as redis
 import json
 import os
+import logging
 
-import redis
+logger = logging.getLogger(__name__)
 
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-CACHE_TTL_SECONDS = 30
-TASKS_LIST_KEY = "tasks:list"
-TASK_KEY_TMPL = "tasks:{task_id}"
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
-client = redis.from_url(REDIS_URL, decode_responses=True)
+class Cache:
+    def __init__(self):
+        self.redis = None
+        self._connected = False
 
+    async def connect(self):
+        """Connect to Redis"""
+        try:
+            self.redis = await redis.from_url(REDIS_URL, decode_responses=True)
+            await self.redis.ping()
+            self._connected = True
+            logger.info("Connected to Redis successfully")
+        except Exception as e:
+            logger.error(f"Failed to connect to Redis: {e}")
+            self._connected = False
 
-def get_cached_tasks():
-    raw = client.get(TASKS_LIST_KEY)
-    return json.loads(raw) if raw else None
+    async def get(self, key: str):
+        """Get a value from cache"""
+        if not self._connected or not self.redis:
+            return None
+        try:
+            data = await self.redis.get(key)
+            return json.loads(data) if data else None
+        except Exception as e:
+            logger.warning(f"Redis get error: {e}")
+            return None
 
+    async def set(self, key: str, value: dict, ttl=60):
+        """Set a value in cache with TTL"""
+        if not self._connected or not self.redis:
+            return
+        try:
+            await self.redis.setex(key, ttl, json.dumps(value))
+        except Exception as e:
+            logger.warning(f"Redis set error: {e}")
 
-def set_cached_tasks(tasks):
-    client.set(TASKS_LIST_KEY, json.dumps(tasks), ex=CACHE_TTL_SECONDS)
+    async def delete(self, key: str):
+        """Delete a value from cache"""
+        if not self._connected or not self.redis:
+            return
+        try:
+            await self.redis.delete(key)
+        except Exception as e:
+            logger.warning(f"Redis delete error: {e}")
 
-
-def get_cached_task(task_id: int):
-    raw = client.get(TASK_KEY_TMPL.format(task_id=task_id))
-    return json.loads(raw) if raw else None
-
-
-def set_cached_task(task_id: int, task: dict):
-    client.set(TASK_KEY_TMPL.format(task_id=task_id), json.dumps(task), ex=CACHE_TTL_SECONDS)
-
-
-def invalidate_task_cache(task_id: int):
-    client.delete(TASKS_LIST_KEY)
-    client.delete(TASK_KEY_TMPL.format(task_id=task_id))
+# Create a cache instance
+cache = Cache()
